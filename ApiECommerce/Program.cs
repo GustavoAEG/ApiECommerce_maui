@@ -1,5 +1,5 @@
-using ApiECommerce.Context;
-using ApiECommerce.Repositories;
+using ApiECommerce.Context; // Namespace do seu DbContext
+using ApiECommerce.Repositories; // Namespace dos seus repositórios
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -8,9 +8,7 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// configura a aplicação para autenticar os usuários usando tokens JWT,
-// verificando o emissor, audiência, tempo de vida e chave de assinatura
-// do emissor
+// Configurações de autenticação com JWT
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -20,30 +18,22 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            //define o emissor e a audiência validas para o token
-            //JWT obtidos da aplicação
             ValidAudience = builder.Configuration["JWT:Audience"],
             ValidIssuer = builder.Configuration["JWT:Issuer"],
-            //Define a chave de assinatura usada para assinar e
-            //verificar o token JWT.
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding
-                .UTF8.GetBytes(builder.Configuration["JWT:Key"]))
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["JWT:Key"]))
         };
     });
 
+// Configuração do Swagger
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "ApiECommerce", Version = "v1" });
-
-    // Define um esquema securo para JWT
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Description = "JWT Authorization usando o Bearer scheme",
         Type = SecuritySchemeType.Http,
         Scheme = "bearer"
     });
-
-    // Implementa a autenticação em todos os endpoints da API
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
@@ -60,27 +50,31 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
+// Obtendo a string de conexão e configurando o DbContext
 var connection = builder.Configuration.GetConnectionString("DefaultConnection");
 
-//permite injetar a instância do contexto nos controladores
-builder.Services.AddDbContext<AppDbContext>(option =>
-                                            option.UseSqlServer(connection));
+// Adicionando o DbContext para que ele possa ser injetado nos controladores
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseSqlServer(connection, sqlOptions =>
+        sqlOptions.EnableRetryOnFailure())); // Habilita a resiliência a falhas transitórias
 
-// Adiciona os serviços ao container.
+// Adiciona os serviços ao container
 builder.Services.AddControllers();
 
+// Adicionando os repositórios
 builder.Services.AddScoped<ICategoriaRepository, CategoriaRepository>();
 builder.Services.AddScoped<IProdutoRepository, ProdutoRepository>();
 
 var app = builder.Build();
 
+// Configuração do Swagger
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
     c.SwaggerEndpoint("/swagger/v1/swagger.json", "AppLanches V1");
 });
 
-// Configure o pipeline do HTTP request 
+// Configuração do pipeline de requisições HTTP
 app.UseStaticFiles();
 app.UseHttpsRedirection();
 
